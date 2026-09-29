@@ -14,7 +14,11 @@ final class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     private let context = CIContext(options: [.cacheIntermediates: false])
     private var pipeline: LGFramePipeline?
     private var modelStore: ModelStore?
-    private let publisher = CameraPublisherClient()
+    // Preview receives frames on processingQueue and never creates an XPC publisher.
+    typealias PreviewSink = (CVPixelBuffer, CVPixelBuffer, String) -> Void
+    private let publisher: CameraPublisherClient?
+    private let preview: PreviewSink?
+    private var correctionEnabled = true
     private var inputPool: CVPixelBufferPool?
     private var outputPool: CVPixelBufferPool?
     private var failureReported = false
@@ -25,9 +29,19 @@ final class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
     @MainActor private var generation = 0
     @MainActor var onFailure: ((Error) -> Void)?
 
-    override init() {
+    init(preview: PreviewSink? = nil) {
+        self.preview = preview
+        publisher = preview == nil ? CameraPublisherClient() : nil
         super.init()
         worker = LatestFrameWorker(queue: processingQueue) { [weak self] frame in self?.process(frame) }
+    }
+
+    func setPreviewCorrection(_ enabled: Bool) {
+        processingQueue.async {
+            guard self.preview != nil else { return }
+            self.correctionEnabled = enabled
+            self.pipeline?.reset()
+        }
     }
 
     @MainActor func start(models: URL, sourceID: String? = nil) async throws {
@@ -40,7 +54,10 @@ final class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
         default: allowed = false
         }
         guard generation == token else { throw CancellationError() }
-        guard allowed else { throw GazeError.message("Allow Locked Gaze to access the camera in System Settings > Privacy & Security > Camera.") }
+        guard allowed else {
+            let appName = Bundle.main.object(forInfoDictionaryKey: "CFBundleName") as? String ?? "Locked Gaze"
+            throw GazeError.message("Allow \(appName) to access the camera in System Settings > Privacy & Security > Camera.")
+        }
         do {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 processingQueue.async {
@@ -55,10 +72,10 @@ final class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
                 }
             }
             guard generation == token else { throw CancellationError() }
-            try await StartupRetry.run {
+            if let publisher { try await StartupRetry.run {
                 guard self.generation == token else { throw CancellationError() }
-                try await self.publisher.start()
-            }
+                try await publisher.start()
+            } }
             try Task.checkCancellation()
             guard generation == token else { throw CancellationError() }
             await withCheckedContinuation { continuation in
@@ -121,7 +138,7 @@ final class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
                 for output in self.capture.outputs { self.capture.removeOutput(output) }
                 self.capture.commitConfiguration()
                 self.processingQueue.async {
-                    self.publisher.stop(); self.pipeline?.reset(); self.pipeline = nil; self.modelStore = nil
+                    self.publisher?.stop(); self.pipeline?.reset(); self.pipeline = nil; self.modelStore = nil
                     self.inputPool = nil; self.outputPool = nil
                     continuation.resume()
                 }
@@ -180,9 +197,18 @@ final class CameraSession: NSObject, AVCaptureVideoDataOutputSampleBufferDelegat
                     context.render(centered.composited(over: background), to: normalized)
                     input = normalized
                 }
+                if let preview {
+                    if correctionEnabled {
+                        try pipeline.processPixelBuffer(input, into: corrected)
+                        preview(input, corrected, "\(pipeline.lastStatus): \(pipeline.lastReason)")
+                    } else {
+                        preview(input, input, "Correction off")
+                    }
+                    return
+                }
                 try pipeline.processPixelBuffer(input, into: corrected)
                 if ProcessInfo.processInfo.systemUptime - frame.receivedAt < CameraContract.staleAfter {
-                    try publisher.send(corrected)
+                    try publisher?.send(corrected)
                 }
             } catch {
                 failureReported = true

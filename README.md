@@ -81,6 +81,43 @@ Requires **macOS 14 Sonoma or later**, with **M2 Pro / Max / Ultra or a newer Pr
 
 ## M5 source build
 
+### Local camera preview (no developer account)
+
+To test eye-contact correction without installing a virtual camera:
+
+```sh
+cd ~/locked-gaze
+bash scripts/build-preview.sh
+open "build/Preview/Locked Gaze Preview.app"
+```
+
+The build uses the compiled models in your installed
+`/Applications/Locked Gaze.app` by default. To use your own compatible models,
+set `LOCKED_GAZE_MODELS_PATH` to their directory before building. Models are
+copied into the ignored local build output and are never committed.
+
+Select a camera and click **Start Preview**, then approve the macOS camera
+permission prompt. Compare the original and corrected views, or toggle
+**Eye-contact correction** off/on. Status shows whether the pipeline corrected
+the frame or bypassed it (for example, no face found); FPS measures displayed
+frames. Stop the preview before choosing another camera. **Stop Preview** or
+closing the window releases the camera and clears both images.
+
+This is a separate, locally ad-hoc-signed app. It needs the Xcode command-line
+toolchain and CMake, but no Apple signing certificate, provisioning profile,
+system extension, or Xcode GUI. It does not record/upload video or appear as a
+camera in Zoom/Teams. If camera permission is denied, enable **Locked Gaze
+Preview** in System Settings → Privacy & Security → Camera and retry.
+
+A synthetic smoke test loads the models, processes a black frame, and renders
+both views without camera capture:
+
+```sh
+"build/Preview/Locked Gaze Preview.app/Contents/MacOS/LockedGazePreview" --smoke-test
+```
+
+### Virtual camera build
+
 This fork allows the **base Apple M5** through the activation check, alongside
 the existing M2-or-newer Pro / Max / Ultra chips. It does not change the App
 Store release. Passing the hardware check does not establish gaze-correction
