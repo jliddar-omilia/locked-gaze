@@ -218,7 +218,9 @@ final class PreviewApp: NSObject, NSApplicationDelegate, NSWindowDelegate {
             }
             print("PASS: preview model loading, synthetic native processing, two image views, no camera or extension")
             fflush(stdout)
-            NSApp.terminate(nil)
+            // No capture session was started. Avoid nesting AppKit's termination
+            // run loop inside this main-dispatch smoke-test callback.
+            exit(0)
         } catch { fputs("Preview smoke test failed: \(error)\n", stderr); exit(1) }
     }
 }
