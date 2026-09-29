@@ -1,9 +1,9 @@
 import AppKit
 
-for chip in ["Apple M2 Pro", "Apple M2 Max", "Apple M2 Ultra", "Apple M3 Pro", "Apple M4 Max", "Apple M5 Pro"] {
+for chip in ["Apple M2 Pro", "Apple M2 Max", "Apple M2 Ultra", "Apple M3 Pro", "Apple M4 Max", "Apple M5", "Apple M5 Pro", "Apple M5 Max", "Apple M5 Ultra", "Apple M10 Pro"] {
     precondition(PlatformRequirements.supports(chip), chip)
 }
-for chip in ["Apple M1 Ultra", "Apple M2", "Apple M3", "Apple M4", "Intel Core i9", "Unknown processor"] {
+for chip in ["Apple M1", "Apple M1 Ultra", "Apple M2", "Apple M3", "Apple M4", "Apple M6", "Intel Core i9", "Unknown processor", "", "Apple M5 Something", "Apple M5 Pro Something", "Not Apple M5", "M5 Pro"] {
     precondition(!PlatformRequirements.supports(chip), chip)
 }
 for active in [false, true] {

@@ -79,6 +79,44 @@ Locked Gaze is available **free on the Mac App Store**. Download the ready-to-us
 
 Requires **macOS 14 Sonoma or later**, with **M2 Pro / Max / Ultra or a newer Pro / Max / Ultra chip**. Camera access and approval of the Locked Gaze camera extension are required.
 
+## M5 source build
+
+This fork allows the **base Apple M5** through the activation check, alongside
+the existing M2-or-newer Pro / Max / Ultra chips. It does not change the App
+Store release. Passing the hardware check does not establish gaze-correction
+quality or real-time performance; those require testing with compatible models.
+
+Build on Apple Silicon with Xcode (macOS 26 SDK or later), Python 3, and CMake:
+
+```sh
+python3 scripts/generate-project.py
+bash scripts/test-source.sh
+LOCKED_GAZE_SOURCE_ONLY=1 xcodebuild -project LockedGaze.xcodeproj \
+  -scheme LockedGaze -configuration Release -derivedDataPath build/SourceOnly \
+  CODE_SIGNING_ALLOWED=NO build
+```
+
+That command creates an **unsigned, model-free verification build**, not a
+working virtual camera. For a usable build, supply compatible models through
+`LOCKED_GAZE_MODELS_PATH`, omit `LOCKED_GAZE_SOURCE_ONLY` and
+`CODE_SIGNING_ALLOWED=NO`, and configure your own Apple signing team in the
+ignored `Config/Signing.local.xcconfig`:
+
+```xcconfig
+DEVELOPMENT_TEAM = YOUR_TEAM_ID
+```
+
+The camera extension needs suitable Apple signing/provisioning, installation
+at `/Applications/Locked Gaze.app`, camera permission, and extension approval
+in macOS. See [model and signing requirements](Models/README.md#compiling-the-source-edition).
+Keep model files and signing material local; they are not part of this fork.
+
+Verified on a base Apple M5 with macOS 27 and Xcode 27: all 12 source test
+suites passed, an unsigned Release build succeeded, and all four locally
+installed models loaded and produced finite outputs with synthetic inputs.
+Live camera operation and visual correction quality have not been verified;
+the test machine had no Apple code-signing identity.
+
 ## Support the project
 
 Locked Gaze is free, with no subscriptions or hidden payments. If you find it useful, [give the project a star](https://github.com/albond/locked-gaze) or leave an optional tip to support development. Donations do not unlock features; the app is complete for everyone.

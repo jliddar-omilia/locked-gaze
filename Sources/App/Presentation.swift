@@ -15,7 +15,7 @@ enum AppArtwork {
 // Product support policy; inference benchmarking remains a separate acceptance stage.
 enum PlatformRequirements {
     static let summary = "macOS 14 Sonoma or later"
-    static let processors = "M2 Pro / Max / Ultra or a newer Pro / Max / Ultra chip"
+    static let processors = "Apple M5, or M2 or newer Pro / Max / Ultra"
     static var chip: String {
         var size = 0
         guard sysctlbyname("machdep.cpu.brand_string", nil, &size, nil, 0) == 0 else { return "Unknown processor" }
@@ -24,8 +24,11 @@ enum PlatformRequirements {
         return String(cString: bytes)
     }
     static func supports(_ name: String) -> Bool {
-        guard let range = name.range(of: #"\bM([0-9]+) (Pro|Max|Ultra)\b"#, options: .regularExpression) else { return false }
-        let model = name[range].split(separator: " ")[0].dropFirst()
+        // The base M5 is allowed explicitly; this is an activation policy,
+        // not a claim of measured inference performance on future base chips.
+        if name == "Apple M5" { return true }
+        guard let range = name.range(of: #"^Apple M([0-9]+) (Pro|Max|Ultra)$"#, options: .regularExpression) else { return false }
+        let model = name[range].split(separator: " ")[1].dropFirst()
         return (Int(model) ?? 0) >= 2
     }
 }
